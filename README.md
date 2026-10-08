@@ -27,7 +27,8 @@
 - **No echo in the transcript.** When you talk without headphones, your mic also hears the other side through
   the speakers. Those phrases are dropped from the transcript. Apple's voice processing can also remove the
   echo from the audio itself (Voice Mode), but it is off by default: while it runs, macOS makes the built-in
-  mic much quieter for every other app that records it.
+  mic much quieter for every other app that records it. When the call app runs voice processing itself
+  (FaceTime does), Tapetum turns it on too, because only then does it hear you at full level.
 - **Real pause.** Nothing from a paused stretch is written to disk. The note marks where the pause was.
 - **Plain Markdown.** Each call becomes a note with frontmatter and the recording embedded next to it. It works
   as is in [Obsidian](https://obsidian.md).
@@ -130,7 +131,7 @@ Every key in `config.json` is optional.
 | `retryIntervalSec` | `600` | How often waiting transcriptions are retried. |
 | `silenceThresholdDB`, `systemSilenceThresholdDB` | `-40`, `-65` | A quieter track is not sent to the server (Whisper invents text on silence). |
 | `startDelaySec` | `0` | Wait this long after an app opens the mic before recording. |
-| `voiceMode` | `false` | Apple voice processing (echo cancellation) on your mic for every call. While it runs, other apps recording the built-in mic get a signal about 40 dB quieter. |
+| `voiceMode` | `false` | Apple voice processing (echo cancellation) on your mic for every call. While it runs, other apps recording the built-in mic get a signal about 40 dB quieter. Calls in apps that use voice processing themselves (FaceTime) get it either way. |
 | `fastStart` | `true` | With Voice Mode, record the plain mic while voice processing starts, so the first words are kept. |
 
 ## The note

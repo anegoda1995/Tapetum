@@ -50,7 +50,8 @@ enum TapetumApp {
         case "--list-mic":
             let c = Config.load()
             for u in AudioProcesses.inputUsers(excluding: getpid(), config: c) {
-                print("\(u.pid) \(u.executable) \(u.bundleID) -> \(AudioProcesses.displayName(u))")
+                let voice = AudioProcesses.usesVoiceProcessing([u]) ? " [voice processing]" : ""
+                print("\(u.pid) \(u.executable) \(u.bundleID) -> \(AudioProcesses.displayName(u))\(voice)")
             }
             exit(0)
         default:
