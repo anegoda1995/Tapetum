@@ -4,6 +4,7 @@
 # 3) A frozen remote track: the watchdog must restart it.
 # 4) Muted in the call app: the mic is released but the app keeps playing, so the recording must go on with
 #    Tapetum's own mic released too, and the mic must come back when the app unmutes.
+# 5) A call app on voice processing (like FaceTime): Tapetum must turn voice processing on too.
 # Usage: tests/crash_and_race.sh [remote-audio-file] [work dir]. Same requirements as tests/e2e.sh.
 # The mute test plays the remote side through the speakers; MUTECALL_OUTPUT=<device name> sends it to another
 # output device instead (a virtual one keeps the test silent).
@@ -95,5 +96,15 @@ T_END=$(date +%s)
 waitfor state idle 15 && ok "stopped $(( $(date +%s) - T_END )) s after the app went silent" || bad "did not stop after the app went silent"
 grep -q "the call app is silent too" "$WORK/mute.log" && ok "end detected through the app's sound" || bad "no silent-app detection in log"
 kill $APP; wait $APP 2>/dev/null
-[ $FAIL -eq 0 ] && echo "CRASH+RACE+STALL+MUTE PASSED" || echo "CRASH+RACE+STALL+MUTE: $FAIL FAILED"
+echo "== a call app on voice processing (like FaceTime): Tapetum must follow it into voice processing"
+home
+swiftc -O "$ROOT/tests/tools/vpcaller.swift" -o "$WORK/vpcaller" 2>/dev/null
+"$APPBIN" -AppleLanguages "(en)" > "$WORK/vp.log" 2>&1 & APP=$!
+sleep 2
+"$WORK/vpcaller" 10 > "$WORK/vpcaller.log" 2>&1 & VC=$!
+waitfor state recording 5 && ok "call detected" || bad "call not detected"
+waitfor voiceActual True 8 && ok "voice processing turned on to match the call app" || bad "voice processing not turned on: $(st voiceMode)/$(st voiceActual)"
+grep -q "the call app records through voice processing" "$WORK/vp.log" && ok "logged why" || bad "no voice processing detection in the log"
+wait $VC; kill $APP; wait $APP 2>/dev/null
+[ $FAIL -eq 0 ] && echo "CRASH+RACE+STALL+MUTE+VP PASSED" || echo "CRASH+RACE+STALL+MUTE+VP: $FAIL FAILED"
 exit $FAIL
