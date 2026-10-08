@@ -95,6 +95,21 @@ enum AudioProcesses {
         return inputs.contains(def) || mics.contains(def) ? def : nil
     }
 
+    /// Whether a call app records through Apple voice processing itself. Such an app lists an output-only device
+    /// (the speakers, its echo reference) among its inputs, or, like FaceTime's avconferenced, no devices at all.
+    /// A plain recorder lists just its mic. While a voice processing app runs, the built-in mic is in a mode where
+    /// every other client hears it about 40 dB down, and only another voice processing client gets the voice at
+    /// full level.
+    static func usesVoiceProcessing(_ users: [MicUser]) -> Bool {
+        users.contains { u in
+            guard u.object != kAudioObjectUnknown else { return false }
+            let inputs = CA.objects(u.object, kAudioProcessPropertyDevices, scope: kAudioObjectPropertyScopeInput)
+            let outputs = CA.objects(u.object, kAudioProcessPropertyDevices, scope: kAudioObjectPropertyScopeOutput)
+            if inputs.isEmpty && outputs.isEmpty { return true }
+            return inputs.contains { CA.inputStreamCount($0) == 0 }
+        }
+    }
+
     static func deviceName(_ device: AudioObjectID) -> String {
         CA.string(device, kAudioObjectPropertyName) ?? "\(device)"
     }

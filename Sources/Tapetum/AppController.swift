@@ -21,6 +21,11 @@ final class Session {
     /// The call app let go of the mic (you muted yourself, a voice message ended), so ours is released too and only
     /// the other side is recorded until the app takes the mic again.
     var micParked = false
+    /// The voice mode is no longer chosen automatically for this call: it was set by hand, or voice processing
+    /// failed to start.
+    var voiceLocked = false
+    /// Since when the call app has looked like it records through voice processing (usesVoiceProcessing).
+    var callerVoiceSince: Date?
     var micProblem: String?
     var sysProblem: String?
     var sysNoCallbacks = false
@@ -241,6 +246,21 @@ final class AppController: NSObject, NSMenuDelegate {
                     idleSince = nil
                     silentSince = nil
                     Log.info("detect: microphone is used again, recording continues")
+                }
+                // A call app on voice processing (FaceTime) leaves the plain mic about 40 dB down for everybody else:
+                // follow it into voice processing, which costs the others nothing, since the mic is in that mode
+                // already. One second of the same answer first: a starting app can show an empty device list.
+                if !voiceMode, !s.voiceLocked, state == .recording, AudioProcesses.usesVoiceProcessing(users) {
+                    if s.callerVoiceSince == nil {
+                        s.callerVoiceSince = now
+                    } else if now.timeIntervalSince(s.callerVoiceSince!) >= 1 {
+                        Log.info("detect: the call app records through voice processing, so Tapetum turns it on too")
+                        voiceMode = true
+                        requestRestart("the call app uses voice processing")
+                        refresh()
+                    }
+                } else {
+                    s.callerVoiceSince = nil
                 }
                 return
             }
@@ -509,7 +529,10 @@ final class AppController: NSObject, NSMenuDelegate {
         DispatchQueue.main.async { [weak self] in
             s.voiceActual = actual
             s.micProblem = problem
-            if actual != voice, self?.session === s { self?.voiceMode = actual }
+            if actual != voice, self?.session === s {
+                self?.voiceMode = actual
+                s.voiceLocked = true   // voice processing failed here, so it is not tried again for this call
+            }
             self?.checkHealth(s, track, label: "mic")
             self?.refresh()
         }
@@ -689,6 +712,7 @@ final class AppController: NSObject, NSMenuDelegate {
 
     func setVoiceMode(_ on: Bool) {
         guard state != .idle, on != voiceMode else { return }
+        session?.voiceLocked = true
         voiceMode = on
         Log.info("session: voice mode \(on ? "on" : "off")")
         if state == .recording { requestRestart("voice mode toggled") }
