@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "Tapetum records your voice during calls so the conversation can be transcribed.";
+"NSAudioCaptureUsageDescription" = "Tapetum records the other side of your calls so the conversation can be transcribed.";

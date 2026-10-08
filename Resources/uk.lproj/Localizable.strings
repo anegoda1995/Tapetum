@@ -1,0 +1,63 @@
+/* Menu */
+"Recording: %@ · %@" = "Записує: %@ · %@";
+"Paused: %@ · %@ recorded" = "Пауза: %@ · записано %@";
+"Transcribing…" = "Розшифровує запис…";
+"Waiting for the Whisper server: %ld" = "Чекає на Whisper-сервер: %ld";
+"Idle · recording calls automatically" = "Спить · автозапис дзвінків увімкнений";
+"Idle · automatic recording is off" = "Спить · автозапис вимкнений";
+"No microphone permission: open Settings…" = "Немає дозволу на мікрофон: відкрити налаштування…";
+"Allow recording the other side…" = "Дозволити запис звуку співрозмовників…";
+"Pause" = "Пауза";
+"Stop Recording" = "Зупинити запис";
+"Resume Recording" = "Продовжити запис";
+"Record Now" = "Почати запис зараз";
+"Voice Mode (Echo Cancellation)" = "Голосовий режим (придушення луни)";
+"Record Calls Automatically" = "Автозапис дзвінків";
+"Retry Transcription (%ld)" = "Повторити розшифровку (%ld)";
+"Open Notes Folder" = "Відкрити теку розмов";
+"Quit %@" = "Вийти з %@";
+"Manual recording" = "Запис вручну";
+"Call" = "Дзвінок";
+
+/* Capture problems */
+"Voice mode did not start, recording the plain microphone" = "Голосовий режим не ввімкнувся, пишу звичайний мікрофон";
+"Microphone is not recording: %@" = "Мікрофон не пишеться: %@";
+"The other side is not recording: %@" = "Звук співрозмовників не пишеться: %@";
+"Microphone is not recording: no microphone permission?" = "Мікрофон не пишеться: немає дозволу на мікрофон?";
+"The other side is not recording: no System Audio Recording permission?" = "Звук співрозмовників не пишеться: немає дозволу «Запис системного звуку»?";
+"no audio unit for the microphone" = "немає аудіоблока мікрофона";
+"could not select the microphone (%d)" = "не вдалося вибрати мікрофон (%d)";
+"microphone unavailable (format %@)" = "мікрофон недоступний (формат %@)";
+"no microphone" = "немає мікрофона";
+"the microphone is busy" = "мікрофон зайнятий";
+"could not add the capture output" = "не вдалося додати вихід захоплення";
+"could not create the audio tap (%d)" = "не вдалося створити tap (%d)";
+"could not create the aggregate device (%d)" = "не вдалося створити агрегатний пристрій (%d)";
+"could not create the audio callback (%d)" = "не вдалося створити аудіо-callback (%d)";
+"could not start the audio tap (%d)" = "не вдалося запустити tap (%d)";
+
+/* Processing and transcription */
+"Could not assemble the audio: %@" = "Не вдалося зібрати аудіо: %@";
+"Could not write the note: %@" = "Не вдалося записати нотатку: %@";
+"no answer" = "сервер не відповідає";
+"No Whisper server set (serverURL in config.json)" = "Whisper-сервер не задано (serverURL у config.json)";
+"Whisper server unavailable (%@)" = "Whisper-сервер недоступний (%@)";
+"The Whisper server did not accept the key (401)" = "Whisper-сервер не прийняв ключ (401)";
+"Access denied (403): %@" = "Доступ заборонено (403): %@";
+"Too many requests, try again later (429)" = "Забагато запитів, спробуйте пізніше (429)";
+"Server error %ld: %@" = "Помилка сервера %ld: %@";
+"unexpected response: %@" = "невідома відповідь: %@";
+
+/* Notes */
+"Me" = "Я";
+"Them" = "Співрозмовник";
+"Speaker %ld" = "Співрозмовник %ld";
+"[unclear?]" = "[нерозбірливо?]";
+"Paused, %@ not recorded." = "Пауза: запис не вівся %@.";
+"No speech found in the recording." = "Мови в записі не знайдено.";
+"Transcription in progress. If the Whisper server is offline, this note fills in by itself once it is back." = "Розшифровка ще в роботі. Якщо Whisper-сервер вимкнений, нотатка оновиться сама, щойно він з'явиться.";
+"The other side was not recorded: %@ seems to lack the System Audio Recording permission." = "Звук співрозмовників не записався: схоже, %@ не має дозволу «Запис системного звуку».";
+"Pauses: %ld, %@ not recorded in total." = "Пауз: %ld, разом %@ не записано.";
+"%ld h" = "%ld год";
+"%ld min" = "%ld хв";
+"%ld s" = "%ld с";

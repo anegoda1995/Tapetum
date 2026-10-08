@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tag matches the app version
+        run: |
+          version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match CFBundleShortVersionString $version"
+            exit 1
+          fi
+
+      - name: Build (Apple silicon + Intel)
+        run: UNIVERSAL=1 ./build.sh
+
+      - name: Self-test
+        run: |
+          build/Tapetum.app/Contents/MacOS/Tapetum --selftest
+          python3 scripts/check_strings.py
+
+      - name: Package
+        run: |
+          zip="Tapetum-${GITHUB_REF_NAME#v}.zip"
+          ditto -c -k --keepParent build/Tapetum.app "build/$zip"
+          (cd build && shasum -a 256 "$zip" > "$zip.sha256")
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Universal build for Apple silicon and Intel Macs, macOS 14.2 or later.
+
+          The app is signed ad hoc, not notarized. After unzipping, move `Tapetum.app` to Applications and clear
+          the download flag once:
+
+          ```
+          xattr -dr com.apple.quarantine /Applications/Tapetum.app
+          ```
+
+          or open it once and allow it in System Settings > Privacy & Security > Open Anyway.
+          See the [README](https://github.com/${{ github.repository }}#install) for setup.
+          NOTES
+          gh release create "$GITHUB_REF_NAME" build/Tapetum-*.zip build/Tapetum-*.zip.sha256 \
+            --title "Tapetum ${GITHUB_REF_NAME#v}" --notes-file notes.md

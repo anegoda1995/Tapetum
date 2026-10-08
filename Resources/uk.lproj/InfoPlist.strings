@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "Tapetum записує ваш голос під час дзвінків, щоб потім розшифрувати розмову.";
+"NSAudioCaptureUsageDescription" = "Tapetum записує звук співрозмовників під час дзвінків, щоб потім розшифрувати розмову.";

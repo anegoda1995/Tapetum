@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build (Apple silicon + Intel)
+        run: UNIVERSAL=1 ./build.sh
+
+      - name: Self-test
+        run: build/Tapetum.app/Contents/MacOS/Tapetum --selftest
+
+      - name: Self-test in Ukrainian
+        run: build/Tapetum.app/Contents/MacOS/Tapetum --selftest -AppleLanguages '(uk)'
+
+      - name: Self-test on Intel (Rosetta)
+        run: |
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then
+            arch -x86_64 build/Tapetum.app/Contents/MacOS/Tapetum --selftest
+          else
+            echo "Rosetta is not installed on this runner, skipped"
+          fi
+
+      - name: Every string is translated
+        run: python3 scripts/check_strings.py
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Tapetum.app
+          path: build/Tapetum.app
+          retention-days: 7
