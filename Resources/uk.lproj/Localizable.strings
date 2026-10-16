@@ -1,7 +1,8 @@
 /* Menu */
 "Recording: %@ · %@" = "Записує: %@ · %@";
 "Paused: %@ · %@ recorded" = "Пауза: %@ · записано %@";
-"Transcribing…" = "Розшифровує запис…";
+"Transcribing: %ld left" = "Розшифровує: залишилось %ld";
+"Preparing the note…" = "Готує нотатку…";
 "Waiting for the Whisper server: %ld" = "Чекає на Whisper-сервер: %ld";
 "Idle · recording calls automatically" = "Спить · автозапис дзвінків увімкнений";
 "Idle · automatic recording is off" = "Спить · автозапис вимкнений";
