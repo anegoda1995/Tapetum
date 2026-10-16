@@ -60,8 +60,8 @@ struct WhisperClient {
     }
 
     /// Quick check (at most `timeout` s) that the server answers at all; any HTTP status counts. With the server
-    /// off an upload only fails after the TCP connect timeout (over a minute), and the job queue is serial, so
-    /// every waiting recording would hold the next call's note back by that long.
+    /// off an upload only fails after the TCP connect timeout (over a minute), and the transcription queue is serial,
+    /// so every waiting recording would hold the next call's transcription back by that long.
     func reachable(timeout: TimeInterval = 5) -> Bool {
         guard let url = URL(string: config.serverURL + "/v1/models") else { return true }
         let key = apiKey()

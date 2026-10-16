@@ -191,7 +191,8 @@ Language & Region > Applications.
   request back.
 - **On disk first.** Both tracks are written in parts next to a manifest, so nothing depends on memory. After the
   call the parts are laid out on one pause-free timeline, encoded as 16 kHz AAC, quiet tracks are raised, and a
-  mix goes next to the note. Both tracks are then transcribed in parallel and merged by time.
+  mix goes next to the note. Both tracks are then transcribed in parallel and merged by time. Transcription has its
+  own queue, so a new call's note appears at once even while older recordings still wait for the server.
 - **Muted.** When the call app releases the mic for more than 2 seconds (you muted yourself), Tapetum releases it
   too and records only the other side until the app takes the mic again.
 - **End of call.** The app released the mic and went silent for 5 seconds, or released the mic but kept playing

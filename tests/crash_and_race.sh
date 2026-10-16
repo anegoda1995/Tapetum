@@ -5,6 +5,8 @@
 # 4) Muted in the call app: the mic is released but the app keeps playing, so the recording must go on with
 #    Tapetum's own mic released too, and the mic must come back when the app unmutes.
 # 5) A call app on voice processing (like FaceTime): Tapetum must turn voice processing on too.
+# 6) A slow transcription must not hold back the next call's note, and the menu must count the queue instead of
+#    showing the error of an earlier attempt.
 # Usage: tests/crash_and_race.sh [remote-audio-file] [work dir]. Same requirements as tests/e2e.sh.
 # The mute test plays the remote side through the speakers; MUTECALL_OUTPUT=<device name> sends it to another
 # output device instead (a virtual one keeps the test silent).
@@ -106,5 +108,37 @@ waitfor state recording 5 && ok "call detected" || bad "call not detected"
 waitfor voiceActual True 8 && ok "voice processing turned on to match the call app" || bad "voice processing not turned on: $(st voiceMode)/$(st voiceActual)"
 grep -q "the call app records through voice processing" "$WORK/vp.log" && ok "logged why" || bad "no voice processing detection in the log"
 wait $VC; kill $APP; wait $APP 2>/dev/null
-[ $FAIL -eq 0 ] && echo "CRASH+RACE+STALL+MUTE+VP PASSED" || echo "CRASH+RACE+STALL+MUTE+VP: $FAIL FAILED"
+echo "== a slow transcription must not hold back the next call's note"
+home
+PORT=$(python3 -c "import socket;s=socket.socket();s.bind(('127.0.0.1',0));print(s.getsockname()[1])")
+python3 - "$WORK/home/config.json" "$PORT" <<'PY'
+import json, os, sys
+c = json.load(open(sys.argv[1])) if os.path.exists(sys.argv[1]) else {}
+c["serverURL"] = "http://127.0.0.1:" + sys.argv[2]
+json.dump(c, open(sys.argv[1], "w"))
+PY
+echo 503 > "$WORK/whisper-mode"
+python3 "$ROOT/tests/tools/slowwhisper.py" "$PORT" "$WORK/whisper-mode" > "$WORK/slowwhisper.log" 2>&1 & WS=$!
+TAPETUM_WHISPER_KEY=test-key "$APPBIN" -AppleLanguages "(en)" > "$WORK/queue.log" 2>&1 & APP=$!
+notes(){ ls "$WORK/notes"/*.md 2>/dev/null | wc -l | tr -d ' '; }
+sleep 2
+"$APPBIN" --send start; waitfor state recording 5 || bad "manual start failed"
+sleep 7; "$APPBIN" --send stop
+waitfor headline "Waiting for the Whisper server: 1" 20 && ok "server error: the first call waits for the server" || bad "headline: $(st headline)"
+[ -n "$(st warning)" ] && ok "the menu shows the error: $(st warning)" || bad "no error in the menu while waiting"
+echo "slow 40" > "$WORK/whisper-mode"
+"$APPBIN" --send retry
+waitfor headline "Transcribing: 1 left" 5 && ok "headline while transcribing: $(st headline)" || bad "headline while transcribing: $(st headline)"
+[ -z "$(st warning)" ] && ok "the earlier error is hidden while the queue runs" || bad "earlier error still shown: $(st warning)"
+"$APPBIN" --send start; waitfor state recording 5 || bad "manual start failed"
+sleep 7; "$APPBIN" --send stop; T_STOP=$(date +%s)
+for _ in $(seq 1 60); do [ "$(notes)" = "2" ] && break; sleep 0.5; done
+N_SEC=$(( $(date +%s) - T_STOP ))
+[ "$(notes)" = "2" ] && [ $N_SEC -le 10 ] && ok "the second call's note appeared ${N_SEC} s after the stop, during the first transcription" || bad "second note: $(notes) notes after ${N_SEC} s"
+waitfor transcribing 2 5 && ok "both calls in the transcription queue: $(st headline)" || bad "queue: $(st transcribing), $(st headline)"
+waitfor pending 0 100 && waitfor transcribing 0 5 && ok "both transcribed" || bad "queue did not drain: $(st headline)"
+[ "$(grep -l "The slow server answered" "$WORK/notes"/*.md 2>/dev/null | wc -l | tr -d ' ')" = "2" ] && ok "both notes hold their transcript" || bad "transcripts missing"
+[ -z "$(st warning)" ] && ok "no error left in the menu" || bad "error left: $(st warning)"
+kill $APP $WS; wait $APP $WS 2>/dev/null
+[ $FAIL -eq 0 ] && echo "CRASH+RACE+STALL+MUTE+VP+QUEUE PASSED" || echo "CRASH+RACE+STALL+MUTE+VP+QUEUE: $FAIL FAILED"
 exit $FAIL
