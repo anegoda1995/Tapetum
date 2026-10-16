@@ -2,14 +2,18 @@ import Foundation
 
 /// After a recording: render the tracks, mix them into the notes folder, create the note, transcribe, fill the note.
 /// Every step is persisted in the manifest, so an app restart or an offline server only delays it.
+/// The note and the transcription run on separate queues, so a new call's note never waits behind a transcription
+/// backlog.
 final class JobRunner {
     let config: Config
     private let whisper: WhisperClient
-    private let queue = DispatchQueue(label: "tapetum.jobs")
+    private let finalizeQueue = DispatchQueue(label: "tapetum.finalize")
+    private let transcribeQueue = DispatchQueue(label: "tapetum.transcribe")
     private let lock = NSLock()
-    private var active = 0
-    private var queued = Set<String>()
-    /// Set when the server just did not answer: the other waiting recordings skip it until then (jobs queue only).
+    /// Recording paths running or waiting on each queue; a recording is never queued twice on the same one.
+    private var finalizing = Set<String>()
+    private var transcribing = Set<String>()
+    /// Set when the server just did not answer: the other waiting recordings skip it until then (transcribe queue only).
     private var offlineUntil = Date.distantPast
     var onChange: (() -> Void)?
 
@@ -18,7 +22,10 @@ final class JobRunner {
         whisper = WhisperClient(config: config)
     }
 
-    var isBusy: Bool { lock.lock(); defer { lock.unlock() }; return active > 0 }
+    var isBusy: Bool { lock.lock(); defer { lock.unlock() }; return !finalizing.isEmpty || !transcribing.isEmpty }
+    var isFinalizing: Bool { lock.lock(); defer { lock.unlock() }; return !finalizing.isEmpty }
+    /// Recordings being transcribed or waiting for their turn.
+    var transcribeCount: Int { lock.lock(); defer { lock.unlock() }; return transcribing.count }
 
     private var summaryCache: (at: Date, value: (count: Int, failed: Int, lastError: String?))?
 
@@ -62,29 +69,52 @@ final class JobRunner {
     }
 
     func submit(_ dir: URL) {
+        guard let m = Manifest.load(dir) else { return }
+        switch m.status {
+        case .recording, .finalizing: enqueueFinalize(dir)
+        case .pending: enqueueTranscribe(dir)
+        default: break
+        }
+    }
+
+    private func enqueueFinalize(_ dir: URL) {
+        enqueue(dir, on: finalizeQueue, \.finalizing) { [self] in
+            // Handed over before it leaves `finalizing`, so the runner never looks idle in between.
+            if finalizeJob(dir) { enqueueTranscribe(dir) }
+        }
+    }
+
+    private func enqueueTranscribe(_ dir: URL) {
+        enqueue(dir, on: transcribeQueue, \.transcribing) { [self] in transcribeJob(dir) }
+    }
+
+    private func enqueue(_ dir: URL, on queue: DispatchQueue, _ set: ReferenceWritableKeyPath<JobRunner, Set<String>>,
+                         _ work: @escaping () -> Void) {
         lock.lock()
-        if queued.contains(dir.path) { lock.unlock(); return }
-        queued.insert(dir.path)
+        if self[keyPath: set].contains(dir.path) { lock.unlock(); return }
+        self[keyPath: set].insert(dir.path)
         lock.unlock()
+        notify()
         queue.async { [self] in
-            lock.lock(); active += 1; lock.unlock()
-            notify()
-            process(dir)
-            lock.lock(); active -= 1; queued.remove(dir.path); lock.unlock()
+            work()
+            lock.lock(); self[keyPath: set].remove(dir.path); lock.unlock()
             notify()
         }
     }
 
     /// Synchronous variant for the CLI (--process).
-    func processNow(_ dir: URL) { process(dir) }
+    func processNow(_ dir: URL) {
+        if finalizeJob(dir) { transcribeJob(dir) }
+    }
 
     private func notify() {
         lock.lock(); summaryCache = nil; lock.unlock()
         DispatchQueue.main.async { self.onChange?() }
     }
 
-    private func process(_ dir: URL) {
-        guard var m = Manifest.load(dir) else { return }
+    /// Renders the audio and writes the note. True when the recording then waits for transcription.
+    private func finalizeJob(_ dir: URL) -> Bool {
+        guard var m = Manifest.load(dir) else { return false }
         if m.status == .recording {
             // The app stopped while recording: close the last interval at the last written sample.
             if let last = m.intervals.indices.last, m.intervals[last].end == 0 {
@@ -100,10 +130,15 @@ final class JobRunner {
                 m.lastError = L.format("Could not assemble the audio: %@", error.localizedDescription)
                 m.save(dir)
                 Log.info("jobs: \(m.id) finalize failed: \(error)")
-                return
+                return false
             }
         }
-        if m.status == .pending { transcribe(&m, dir) }
+        return m.status == .pending
+    }
+
+    private func transcribeJob(_ dir: URL) {
+        guard var m = Manifest.load(dir), m.status == .pending else { return }
+        transcribe(&m, dir)
     }
 
     private func finalize(_ m: inout Manifest, _ dir: URL) throws {
@@ -188,7 +223,7 @@ final class JobRunner {
             m.save(dir)
             return
         }
-        // Fail fast while the server is off, so a new call's note is not stuck behind waiting uploads.
+        // Fail fast while the server is off, so the other waiting recordings do not each wait for a timeout.
         if Date() < offlineUntil || !whisper.reachable() {
             if Date() >= offlineUntil { offlineUntil = Date().addingTimeInterval(60) }
             m.attempts += 1

@@ -759,11 +759,20 @@ final class AppController: NSObject, NSMenuDelegate {
         case .recording: return L.format("Recording: %@ · %@", app, elapsed)
         case .paused: return L.format("Paused: %@ · %@ recorded", app, elapsed)
         case .idle:
-            if jobs.isBusy { return L.string("Transcribing…") }
+            let left = jobs.transcribeCount
+            if left > 0 { return L.format("Transcribing: %ld left", left) }
+            if jobs.isFinalizing { return L.string("Preparing the note…") }
             let p = jobs.pendingSummary()
             if p.count > 0 { return L.format("Waiting for the Whisper server: %ld", p.count) }
             return prefs.autoRecord ? L.string("Idle · recording calls automatically") : L.string("Idle · automatic recording is off")
         }
+    }
+
+    /// The last transcription error, for the menu and status.json. Hidden while the queue runs: it is from an earlier
+    /// attempt (often "server unavailable") and would contradict the headline.
+    private func jobWarning(_ p: (count: Int, failed: Int, lastError: String?)) -> String? {
+        guard state == .idle, jobs.transcribeCount == 0, p.count + p.failed > 0 else { return nil }
+        return p.lastError
     }
 
     private func currentRecorded() -> Double {
@@ -800,9 +809,7 @@ final class AppController: NSObject, NSMenuDelegate {
             for problem in [s.micProblem, s.sysProblem].compactMap({ $0 }) { _ = item("⚠︎ " + problem, nil) }
         }
         let pending = jobs.pendingSummary()
-        if state == .idle, let err = pending.lastError, pending.count + pending.failed > 0 {
-            _ = item("⚠︎ " + err, nil)
-        }
+        if let err = jobWarning(pending) { _ = item("⚠︎ " + err, nil) }
         menu.addItem(.separator())
         switch state {
         case .recording:
@@ -871,9 +878,12 @@ final class AppController: NSObject, NSMenuDelegate {
             "micReleased": session?.micParked ?? false,
             "autoRecord": prefs.autoRecord,
             "busy": jobs.isBusy,
+            "transcribing": jobs.transcribeCount,
             "pending": p.count,
             "failed": p.failed,
             "lastError": p.lastError ?? "",
+            "headline": headline,
+            "warning": jobWarning(p) ?? "",
             "micProblem": session?.micProblem ?? "",
             "sysProblem": session?.sysProblem ?? "",
             "micPermission": MicPermission.granted,
